@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fifteen Puzzle</title>
+    <!-- Link to the CSS file -->
+    <link href="style.css" type="text/css" rel="stylesheet" />
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Main container for the entire application -->
+    <div id="container">
+        <h1>Fifteen Puzzle</h1>
+
+        <p>The goal of the fifteen puzzle is to un-jumble its fifteen squares by repeatedly making moves that slide squares into the empty space. How quickly can you solve it?</p>
+
+        <!-- Section for user info and game stats -->
+        <div id="user-info" class="info-box">
+            <h2>Game Info</h2>
+            <p><strong>Player ID:</strong> <span id="userId"></span></p>
+            <p><strong>Moves:</strong> <span id="move-count">0</span></p>
+            <p><strong>Time:</strong> <span id="timer">0s</span></p>
+        </div>
+
+        <!-- The main puzzle area where tiles will be generated -->
+        <div id="puzzlearea">
+            <!-- Puzzle tiles will be dynamically inserted here by JavaScript -->
+        </div>
+
+        <!-- Controls for the game -->
+        <div id="controls">
+            <button id="shufflebutton">Shuffle</button>
+        </div>
+        
+        <!-- Leaderboard Section -->
+        <div id="leaderboard-container" class="info-box">
+            <h2>Leaderboard (Top 10)</h2>
+            <table id="leaderboard">
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Player ID</th>
+                        <th>Time (s)</th>
+                        <th>Moves</th>
+                    </tr>
+                </thead>
+                <tbody id="leaderboard-body">
+                    <!-- Leaderboard data will be populated here -->
+                </tbody>
+            </table>
+        </div>
+
+        <p>American puzzle author and mathematician Sam Loyd is often falsely credited with creating the puzzle; indeed, Loyd claimed from 1891 until his death in 1911 that he invented it. The puzzle was actually created around 1874 by Noyes Palmer Chapman, a postmaster in Canastota, New York.</p>
+
+        <!-- W3C Validator Links -->
+        <div id="w3c">
+            <a href="https://validator.w3.org/check/referer"><img src="https://www.w3.org/Icons/valid-xhtml11" alt="Valid XHTML 1.1" /></a>
+            <a href="https://jigsaw.w3.org/css-validator/check/referer"><img src="https://jigsaw.w3.org/css-validator/images/vcss" alt="Valid CSS" /></a>
+        </div>
+    </div>
+
+    <!-- Win Message Modal -->
+    <div id="win-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h2>Congratulations!</h2>
+            <p>You solved the puzzle!</p>
+            <p><strong>Final Time:</strong> <span id="final-time"></span></p>
+            <p><strong>Total Moves:</strong> <span id="final-moves"></span></p>
+            <button id="close-modal">Play Again</button>
+        </div>
+    </div>
+
+    <!-- Firebase Scripts -->
+    <script type="module">
+        // IMPORTANT: These are special variables provided by the environment.
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "your-api-key", authDomain: "your-auth-domain", projectId: "your-project-id" };
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'fifteen-puzzle';
+
+        // Import the functions you need from the SDKs you need
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, addDoc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        
+        // Enable extensive logging for debugging
+        setLogLevel('debug');
+
+        // Make db and auth globally available for the main script
+        window.db = db;
+        window.auth = auth;
+        window.appId = appId; // Pass appId to the global scope
+
+        // Handle Authentication and Data Fetching
+        onAuthStateChanged(auth, user => {
+            if (user) {
+                console.log("User is signed in:", user.uid);
+                document.getElementById('userId').textContent = user.uid.substring(0, 8) + '...';
+
+                // --- Leaderboard Logic (now inside auth state change) ---
+                const leaderboardBody = document.getElementById('leaderboard-body');
+                const leaderboardCollectionPath = `artifacts/${appId}/public/data/leaderboard`;
+                const q = query(collection(db, leaderboardCollectionPath), orderBy("time"), limit(10));
+
+                onSnapshot(q, (querySnapshot) => {
+                    console.log("Received leaderboard snapshot.");
+                    leaderboardBody.innerHTML = ''; // Clear previous entries
+                    let rank = 1;
+                    querySnapshot.forEach((doc) => {
+                        const data = doc.data();
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${rank++}</td>
+                            <td>${data.userId ? data.userId.substring(0, 8) + '...' : 'N/A'}</td>
+                            <td>${data.time}</td>
+                            <td>${data.moves}</td>
+                        `;
+                        leaderboardBody.appendChild(row);
+                    });
+                }, (error) => {
+                    console.error("Error fetching leaderboard: ", error);
+                });
+
+                // Function to be called from fifteen.js to save score
+                window.saveScore = async (time, moves) => {
+                    if (!auth.currentUser) {
+                        console.error("User not authenticated, cannot save score.");
+                        return;
+                    }
+                    try {
+                        await addDoc(collection(db, leaderboardCollectionPath), {
+                            userId: auth.currentUser.uid,
+                            time: time,
+                            moves: moves,
+                            timestamp: new Date()
+                        });
+                        console.log("Score saved successfully!");
+                    } catch (e) {
+                        console.error("Error adding document: ", e);
+                    }
+                };
+
+                // Signal that auth and data setup is ready
+                document.dispatchEvent(new Event('auth-ready'));
+
+            } else {
+                console.log("User is signed out.");
+                // Optionally clear leaderboard if user signs out
+                document.getElementById('leaderboard-body').innerHTML = '<tr><td colspan="4">Sign in to see the leaderboard.</td></tr>';
+            }
+        });
+
+        // Sign in logic
+        if (initialAuthToken) {
+            signInWithCustomToken(auth, initialAuthToken).catch(error => {
+                console.error("Custom token sign-in failed:", error);
+                signInAnonymously(auth); // Fallback to anonymous
+            });
+        } else {
+            signInAnonymously(auth);
+        }
+    </script>
+    
+    <!-- Link to the main JavaScript file -->
+    <script src="fifteen.js"></script>
+</body>
+</html>
