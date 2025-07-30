@@ -1,0 +1,381 @@
+// Sliding Puzzle Game Logic
+class SlidingPuzzle {
+    constructor() {
+        this.boardSize = 4;
+        this.tileSize = 100;
+        this.tiles = [];
+        this.emptyPosition = { row: 3, col: 3 };
+        this.moves = 0;
+        this.startTime = null;
+        this.timerInterval = null;
+        this.isGameActive = false;
+        this.currentBackground = window.gameData.currentBackground;
+        
+        this.initializeElements();
+        this.createBoard();
+        this.loadLeaderboard();
+        this.setupEventListeners();
+    }
+    
+    initializeElements() {
+        this.board = document.getElementById('puzzle-board');
+        this.moveCounter = document.getElementById('move-count');
+        this.timer = document.getElementById('timer');
+        this.shuffleBtn = document.getElementById('shuffle-btn');
+        this.newGameBtn = document.getElementById('new-game-btn');
+        this.backgroundSelect = document.getElementById('background-select');
+        this.gameStatus = document.getElementById('game-status');
+        this.winModal = document.getElementById('win-modal');
+        this.historyModal = document.getElementById('history-modal');
+    }
+    
+    createBoard() {
+        this.board.innerHTML = '';
+        this.tiles = [];
+        
+        let tileNumber = 1;
+        for (let row = 0; row < this.boardSize; row++) {
+            for (let col = 0; col < this.boardSize; col++) {
+                if (row === 3 && col === 3) continue; // Empty space
+                
+                const tile = document.createElement('div');
+                tile.className = 'puzzle-tile';
+                tile.textContent = tileNumber;
+                tile.dataset.number = tileNumber;
+                tile.dataset.originalRow = row;
+                tile.dataset.originalCol = col;
+                
+                this.positionTile(tile, row, col);
+                this.setTileBackground(tile, row, col);
+                
+                tile.addEventListener('click', () => this.handleTileClick(tile));
+                tile.addEventListener('mouseenter', () => this.handleTileHover(tile));
+                tile.addEventListener('mouseleave', () => this.handleTileLeave(tile));
+                
+                this.board.appendChild(tile);
+                this.tiles.push(tile);
+                tileNumber++;
+            }
+        }
+        
+        this.updateMovableTiles();
+    }
+    
+    positionTile(tile, row, col) {
+        tile.style.left = `${col * this.tileSize}px`;
+        tile.style.top = `${row * this.tileSize}px`;
+        tile.dataset.currentRow = row;
+        tile.dataset.currentCol = col;
+    }
+    
+    setTileBackground(tile, originalRow, originalCol) {
+        const backgroundX = -originalCol * this.tileSize;
+        const backgroundY = -originalRow * this.tileSize;
+        tile.style.backgroundImage = `url('images/${this.currentBackground}')`;
+        tile.style.backgroundPosition = `${backgroundX}px ${backgroundY}px`;
+    }
+    
+    handleTileClick(tile) {
+        if (!this.isTileMovable(tile)) return;
+        
+        if (!this.isGameActive) {
+            this.startGame();
+        }
+        
+        this.moveTile(tile);
+        this.updateMovableTiles();
+        
+        if (this.checkWin()) {
+            this.endGame();
+        }
+    }
+    
+    handleTileHover(tile) {
+        if (this.isTileMovable(tile)) {
+            tile.classList.add('movable');
+        }
+    }
+    
+    handleTileLeave(tile) {
+        tile.classList.remove('movable');
+    }
+    
+    isTileMovable(tile) {
+        const row = parseInt(tile.dataset.currentRow);
+        const col = parseInt(tile.dataset.currentCol);
+        const emptyRow = this.emptyPosition.row;
+        const emptyCol = this.emptyPosition.col;
+        
+        const rowDiff = Math.abs(row - emptyRow);
+        const colDiff = Math.abs(col - emptyCol);
+        
+        return (rowDiff === 1 && colDiff === 0) || (rowDiff === 0 && colDiff === 1);
+    }
+    
+    moveTile(tile) {
+        const tileRow = parseInt(tile.dataset.currentRow);
+        const tileCol = parseInt(tile.dataset.currentCol);
+        
+        // Move tile to empty position
+        this.positionTile(tile, this.emptyPosition.row, this.emptyPosition.col);
+        
+        // Update empty position
+        this.emptyPosition.row = tileRow;
+        this.emptyPosition.col = tileCol;
+        
+        // Update move counter
+        this.moves++;
+        this.moveCounter.textContent = this.moves;
+    }
+    
+    updateMovableTiles() {
+        this.tiles.forEach(tile => {
+            tile.classList.remove('movable');
+        });
+    }
+    
+    shuffle() {
+        this.resetGame();
+        
+        // Perform random valid moves to ensure solvable puzzle
+        const shuffleMoves = 200;
+        for (let i = 0; i < shuffleMoves; i++) {
+            const movableTiles = this.tiles.filter(tile => this.isTileMovable(tile));
+            if (movableTiles.length > 0) {
+                const randomTile = movableTiles[Math.floor(Math.random() * movableTiles.length)];
+                const currentMoves = this.moves;
+                this.moveTile(randomTile);
+                this.moves = currentMoves; // Don't count shuffle moves
+            }
+        }
+        
+        this.moveCounter.textContent = '0';
+        this.updateMovableTiles();
+        this.gameStatus.innerHTML = '<p>Game shuffled! Click any movable tile to start.</p>';
+    }
+    
+    checkWin() {
+        // Check if empty space is in bottom-right corner
+        if (this.emptyPosition.row !== 3 || this.emptyPosition.col !== 3) {
+            return false;
+        }
+        
+        // Check if all tiles are in correct positions
+        return this.tiles.every(tile => {
+            const currentRow = parseInt(tile.dataset.currentRow);
+            const currentCol = parseInt(tile.dataset.currentCol);
+            const originalRow = parseInt(tile.dataset.originalRow);
+            const originalCol = parseInt(tile.dataset.originalCol);
+            
+            return currentRow === originalRow && currentCol === originalCol;
+        });
+    }
+    
+    startGame() {
+        if (this.isGameActive) return;
+        
+        this.isGameActive = true;
+        this.startTime = Date.now();
+        this.gameStatus.innerHTML = '<p>Game in progress... Good luck!</p>';
+        
+        this.timerInterval = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
+            const minutes = Math.floor(elapsed / 60);
+            const seconds = elapsed % 60;
+            this.timer.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }, 1000);
+    }
+    
+    endGame() {
+        this.isGameActive = false;
+        clearInterval(this.timerInterval);
+        
+        const totalTime = Math.floor((Date.now() - this.startTime) / 1000);
+        
+        // Show win modal
+        document.getElementById('final-time').textContent = this.timer.textContent;
+        document.getElementById('final-moves').textContent = this.moves;
+        this.winModal.style.display = 'flex';
+        
+        // Save game stats
+        this.saveGameStats(totalTime);
+        
+        this.gameStatus.innerHTML = '<p>🎉 Congratulations! You solved the puzzle!</p>';
+    }
+    
+    resetGame() {
+        this.isGameActive = false;
+        clearInterval(this.timerInterval);
+        this.moves = 0;
+        this.startTime = null;
+        this.moveCounter.textContent = '0';
+        this.timer.textContent = '00:00';
+        this.emptyPosition = { row: 3, col: 3 };
+        this.createBoard();
+        this.gameStatus.innerHTML = '<p>Click "Shuffle" to start a new game!</p>';
+    }
+    
+    changeBackground(newBackground) {
+        this.currentBackground = newBackground;
+        this.tiles.forEach(tile => {
+            const originalRow = parseInt(tile.dataset.originalRow);
+            const originalCol = parseInt(tile.dataset.originalCol);
+            this.setTileBackground(tile, originalRow, originalCol);
+        });
+        
+        // Save preference
+        this.saveUserPreference(newBackground);
+    }
+    
+    setupEventListeners() {
+        this.shuffleBtn.addEventListener('click', () => this.shuffle());
+        this.newGameBtn.addEventListener('click', () => this.resetGame());
+        this.backgroundSelect.addEventListener('change', (e) => this.changeBackground(e.target.value));
+        
+        // Modal event listeners
+        document.getElementById('play-again-btn').addEventListener('click', () => {
+            this.winModal.style.display = 'none';
+            this.shuffle();
+        });
+        
+        document.getElementById('close-modal-btn').addEventListener('click', () => {
+            this.winModal.style.display = 'none';
+        });
+        
+        document.getElementById('view-history-btn').addEventListener('click', () => {
+            this.showUserHistory();
+        });
+        
+        // Close modals when clicking outside
+        this.winModal.addEventListener('click', (e) => {
+            if (e.target === this.winModal) {
+                this.winModal.style.display = 'none';
+            }
+        });
+        
+        this.historyModal.addEventListener('click', (e) => {
+            if (e.target === this.historyModal) {
+                this.historyModal.style.display = 'none';
+            }
+        });
+    }
+    
+    async saveGameStats(timeSeconds) {
+        try {
+            const response = await fetch('api/save_game.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    moves: this.moves,
+                    time_seconds: timeSeconds,
+                    background_image: this.currentBackground
+                })
+            });
+            
+            if (response.ok) {
+                this.loadLeaderboard(); // Refresh leaderboard
+            }
+        } catch (error) {
+            console.error('Error saving game stats:', error);
+        }
+    }
+    
+    async saveUserPreference(background) {
+        try {
+            await fetch('api/save_preferences.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    background: background
+                })
+            });
+        } catch (error) {
+            console.error('Error saving preferences:', error);
+        }
+    }
+    
+    async loadLeaderboard() {
+        try {
+            const response = await fetch('api/get_leaderboard.php');
+            const data = await response.json();
+            
+            const leaderboard = document.getElementById('leaderboard');
+            leaderboard.innerHTML = '';
+            
+            data.forEach((entry, index) => {
+                const item = document.createElement('div');
+                item.className = 'leaderboard-item';
+                
+                const minutes = Math.floor(entry.time_seconds / 60);
+                const seconds = entry.time_seconds % 60;
+                const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                
+                item.innerHTML = `
+                    <span class="leaderboard-rank">#${index + 1}</span>
+                    <span class="leaderboard-name">${entry.username}</span>
+                    <div class="leaderboard-stats">
+                        <span>${timeStr}</span>
+                        <span>${entry.moves} moves</span>
+                    </div>
+                `;
+                
+                leaderboard.appendChild(item);
+            });
+        } catch (error) {
+            console.error('Error loading leaderboard:', error);
+        }
+    }
+    
+    async showUserHistory() {
+        try {
+            const response = await fetch('api/get_user_history.php');
+            const data = await response.json();
+            
+            const historyContainer = document.getElementById('user-history');
+            historyContainer.innerHTML = '';
+            
+            if (data.length === 0) {
+                historyContainer.innerHTML = '<p>No games played yet.</p>';
+            } else {
+                data.forEach((game, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'history-item';
+                    
+                    const minutes = Math.floor(game.time_seconds / 60);
+                    const seconds = game.time_seconds % 60;
+                    const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                    const date = new Date(game.completed_at).toLocaleDateString();
+                    
+                    item.innerHTML = `
+                        <div class="history-game">
+                            <span class="history-rank">#${index + 1}</span>
+                            <span class="history-time">${timeStr}</span>
+                            <span class="history-moves">${game.moves} moves</span>
+                            <span class="history-date">${date}</span>
+                        </div>
+                    `;
+                    
+                    historyContainer.appendChild(item);
+                });
+            }
+            
+            this.historyModal.style.display = 'flex';
+        } catch (error) {
+            console.error('Error loading user history:', error);
+        }
+    }
+}
+
+// Global functions for modal management
+function closeHistoryModal() {
+    document.getElementById('history-modal').style.display = 'none';
+}
+
+// Initialize game when page loads
+document.addEventListener('DOMContentLoaded', () => {
+    window.game = new SlidingPuzzle();
+});
