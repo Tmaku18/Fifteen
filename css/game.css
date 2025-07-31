@@ -565,3 +565,42 @@ body {
         transform: translateY(0) scale(1);
     }
 }
+
+/* Error and No Data Messages */
+.error-message {
+    background: #f8d7da;
+    color: #721c24;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #f5c6cb;
+    text-align: center;
+    margin: 10px 0;
+    font-size: 0.9em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.error-message::before {
+    content: "⚠️";
+}
+
+.no-data {
+    background: #d1ecf1;
+    color: #0c5460;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #bee5eb;
+    text-align: center;
+    margin: 10px 0;
+    font-size: 0.9em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.no-data::before {
+    content: "ℹ️";
+}

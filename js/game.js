@@ -16,6 +16,7 @@ class SlidingPuzzle {
         this.createBoard();
         this.loadLeaderboard();
         this.setupEventListeners();
+        this.addLeaderboardRefreshButton();
     }
     
     initializeElements() {
@@ -193,6 +194,12 @@ class SlidingPuzzle {
 
         const totalTime = Math.floor((Date.now() - this.startTime) / 1000);
 
+        console.log('Game completed!', {
+            moves: this.moves,
+            totalTime: totalTime,
+            background: this.currentBackground
+        });
+
         // Add celebration effects
         this.celebrateWin();
 
@@ -203,7 +210,7 @@ class SlidingPuzzle {
             this.winModal.style.display = 'flex';
         }, 1500);
 
-        // Save game stats
+        // Save game stats immediately
         this.saveGameStats(totalTime);
 
         this.gameStatus.innerHTML = '<p>🎉 Congratulations! You solved the puzzle!</p>';
@@ -268,6 +275,12 @@ class SlidingPuzzle {
     
     async saveGameStats(timeSeconds) {
         try {
+            console.log('Saving game stats:', {
+                moves: this.moves,
+                time_seconds: timeSeconds,
+                background_image: this.currentBackground
+            });
+
             const response = await fetch('api/save_game.php', {
                 method: 'POST',
                 headers: {
@@ -279,12 +292,24 @@ class SlidingPuzzle {
                     background_image: this.currentBackground
                 })
             });
-            
-            if (response.ok) {
-                this.loadLeaderboard(); // Refresh leaderboard
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
+
+            const result = await response.json();
+            console.log('Game stats saved successfully:', result);
+
+            // Refresh leaderboard after successful save
+            this.loadLeaderboard();
+
         } catch (error) {
             console.error('Error saving game stats:', error);
+            // Show user-friendly message
+            const gameStatus = document.querySelector('.game-status');
+            if (gameStatus) {
+                gameStatus.innerHTML += '<br><small style="color: orange;">⚠️ Score may not have been saved to leaderboard</small>';
+            }
         }
     }
     
@@ -299,27 +324,52 @@ class SlidingPuzzle {
                     background: background
                 })
             });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            if (result.error) {
+                console.error('Error saving preferences:', result.error);
+            }
         } catch (error) {
             console.error('Error saving preferences:', error);
+            // Don't show user error for preferences - it's not critical
         }
     }
     
     async loadLeaderboard() {
         try {
             const response = await fetch('api/get_leaderboard.php');
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
             const data = await response.json();
-            
+
             const leaderboard = document.getElementById('leaderboard');
             leaderboard.innerHTML = '';
-            
+
+            if (data.error) {
+                leaderboard.innerHTML = `<div class="error-message">Error: ${data.error}</div>`;
+                return;
+            }
+
+            if (!data || data.length === 0) {
+                leaderboard.innerHTML = '<div class="no-data">No games played yet. Be the first to complete a puzzle!</div>';
+                return;
+            }
+
             data.forEach((entry, index) => {
                 const item = document.createElement('div');
                 item.className = 'leaderboard-item';
-                
+
                 const minutes = Math.floor(entry.time_seconds / 60);
                 const seconds = entry.time_seconds % 60;
                 const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-                
+
                 item.innerHTML = `
                     <span class="leaderboard-rank">#${index + 1}</span>
                     <span class="leaderboard-name">${entry.username}</span>
@@ -328,34 +378,47 @@ class SlidingPuzzle {
                         <span>${entry.moves} moves</span>
                     </div>
                 `;
-                
+
                 leaderboard.appendChild(item);
             });
         } catch (error) {
             console.error('Error loading leaderboard:', error);
+            const leaderboard = document.getElementById('leaderboard');
+            leaderboard.innerHTML = `<div class="error-message">Failed to load leaderboard. Please refresh the page.</div>`;
         }
     }
     
     async showUserHistory() {
         try {
             const response = await fetch('api/get_user_history.php');
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
             const data = await response.json();
-            
+
             const historyContainer = document.getElementById('user-history');
             historyContainer.innerHTML = '';
-            
-            if (data.length === 0) {
-                historyContainer.innerHTML = '<p>No games played yet.</p>';
+
+            if (data.error) {
+                historyContainer.innerHTML = `<div class="error-message">Error: ${data.error}</div>`;
+                this.historyModal.style.display = 'flex';
+                return;
+            }
+
+            if (!data || data.length === 0) {
+                historyContainer.innerHTML = '<div class="no-data">No games played yet. Complete a puzzle to see your history!</div>';
             } else {
                 data.forEach((game, index) => {
                     const item = document.createElement('div');
                     item.className = 'history-item';
-                    
+
                     const minutes = Math.floor(game.time_seconds / 60);
                     const seconds = game.time_seconds % 60;
                     const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
                     const date = new Date(game.completed_at).toLocaleDateString();
-                    
+
                     item.innerHTML = `
                         <div class="history-game">
                             <span class="history-rank">#${index + 1}</span>
@@ -364,14 +427,17 @@ class SlidingPuzzle {
                             <span class="history-date">${date}</span>
                         </div>
                     `;
-                    
+
                     historyContainer.appendChild(item);
                 });
             }
-            
+
             this.historyModal.style.display = 'flex';
         } catch (error) {
             console.error('Error loading user history:', error);
+            const historyContainer = document.getElementById('user-history');
+            historyContainer.innerHTML = `<div class="error-message">Failed to load game history. Please try again.</div>`;
+            this.historyModal.style.display = 'flex';
         }
     }
 
@@ -470,6 +536,24 @@ class SlidingPuzzle {
                 // Save the random selection as user preference
                 this.saveUserPreference(randomBackground);
             }
+        }
+    }
+
+    addLeaderboardRefreshButton() {
+        const leaderboardPanel = document.querySelector('.leaderboard-panel');
+        if (leaderboardPanel && !leaderboardPanel.querySelector('.refresh-btn')) {
+            const refreshBtn = document.createElement('button');
+            refreshBtn.className = 'btn btn-outline refresh-btn';
+            refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh Leaderboard';
+            refreshBtn.style.marginTop = '10px';
+            refreshBtn.style.width = '100%';
+            refreshBtn.onclick = () => {
+                refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...';
+                this.loadLeaderboard().then(() => {
+                    refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh Leaderboard';
+                });
+            };
+            leaderboardPanel.appendChild(refreshBtn);
         }
     }
 }

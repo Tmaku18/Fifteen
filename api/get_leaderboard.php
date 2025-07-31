@@ -3,12 +3,8 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/game_functions.php';
 
-// Check if user is logged in
-if (!$auth->isLoggedIn()) {
-    http_response_code(401);
-    echo json_encode(['error' => 'Not authenticated']);
-    exit();
-}
+// Leaderboard should be accessible to everyone, not just logged-in users
+// This allows visitors to see the leaderboard and encourages them to play
 
 // Get limit from query parameter (default 10)
 $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 10;

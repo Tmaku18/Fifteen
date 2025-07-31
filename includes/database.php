@@ -1,6 +1,6 @@
 <?php
 // Database configuration - Using SQLite for simplicity
-define('DB_FILE', 'database/sliding_puzzle.db');
+define('DB_FILE', __DIR__ . '/../database/sliding_puzzle.db');
 
 // Create connection
 function getDBConnection() {
@@ -8,15 +8,42 @@ function getDBConnection() {
         // Create database directory if it doesn't exist
         $dbDir = dirname(DB_FILE);
         if (!is_dir($dbDir)) {
-            mkdir($dbDir, 0755, true);
+            if (!mkdir($dbDir, 0777, true)) {
+                throw new Exception("Failed to create database directory: $dbDir");
+            }
+        }
+
+        // Check if directory is writable
+        if (!is_writable($dbDir)) {
+            // Try to make it writable
+            chmod($dbDir, 0777);
+            if (!is_writable($dbDir)) {
+                throw new Exception("Database directory is not writable: $dbDir");
+            }
         }
 
         $pdo = new PDO("sqlite:" . DB_FILE);
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+        // Enable foreign key constraints
+        $pdo->exec("PRAGMA foreign_keys = ON");
+
+        // Set journal mode for better concurrency
+        $pdo->exec("PRAGMA journal_mode = WAL");
+
+        // Check if database file is writable
+        if (file_exists(DB_FILE) && !is_writable(DB_FILE)) {
+            chmod(DB_FILE, 0666);
+        }
+
         return $pdo;
     } catch(PDOException $e) {
-        die("Connection failed: " . $e->getMessage());
+        error_log("Database connection failed: " . $e->getMessage());
+        die("Database connection failed. Please check file permissions.");
+    } catch(Exception $e) {
+        error_log("Database setup failed: " . $e->getMessage());
+        die("Database setup failed: " . $e->getMessage());
     }
 }
 
@@ -33,6 +60,7 @@ function initializeDatabase() {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
+            email TEXT,
             is_admin INTEGER DEFAULT 0,
             is_active INTEGER DEFAULT 1,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
