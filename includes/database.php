@@ -72,6 +72,11 @@ function initializeDatabase() {
         $stmt->execute(['default.jpg', 'Default Landscape']);
         $stmt->execute(['nature.jpg', 'Nature Scene']);
         $stmt->execute(['abstract.jpg', 'Abstract Pattern']);
+        $stmt->execute(['ocean.jpg', 'Ocean Waves']);
+        $stmt->execute(['mountains.jpg', 'Mountain Vista']);
+        $stmt->execute(['city.jpg', 'City Skyline']);
+        $stmt->execute(['space.jpg', 'Space Galaxy']);
+        $stmt->execute(['flowers.jpg', 'Flower Garden']);
 
         // Add is_active column if it doesn't exist (migration)
         try {

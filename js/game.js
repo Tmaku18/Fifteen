@@ -10,8 +10,9 @@ class SlidingPuzzle {
         this.timerInterval = null;
         this.isGameActive = false;
         this.currentBackground = window.gameData.currentBackground;
-        
+
         this.initializeElements();
+        this.selectRandomBackground();
         this.createBoard();
         this.loadLeaderboard();
         this.setupEventListeners();
@@ -189,17 +190,22 @@ class SlidingPuzzle {
     endGame() {
         this.isGameActive = false;
         clearInterval(this.timerInterval);
-        
+
         const totalTime = Math.floor((Date.now() - this.startTime) / 1000);
-        
-        // Show win modal
-        document.getElementById('final-time').textContent = this.timer.textContent;
-        document.getElementById('final-moves').textContent = this.moves;
-        this.winModal.style.display = 'flex';
-        
+
+        // Add celebration effects
+        this.celebrateWin();
+
+        // Show win modal with delay for effect
+        setTimeout(() => {
+            document.getElementById('final-time').textContent = this.timer.textContent;
+            document.getElementById('final-moves').textContent = this.moves;
+            this.winModal.style.display = 'flex';
+        }, 1500);
+
         // Save game stats
         this.saveGameStats(totalTime);
-        
+
         this.gameStatus.innerHTML = '<p>🎉 Congratulations! You solved the puzzle!</p>';
     }
     
@@ -366,6 +372,104 @@ class SlidingPuzzle {
             this.historyModal.style.display = 'flex';
         } catch (error) {
             console.error('Error loading user history:', error);
+        }
+    }
+
+    celebrateWin() {
+        // Add celebration class to game board
+        this.board.classList.add('celebration');
+
+        // Create confetti effect
+        this.createConfetti();
+
+        // Add pulsing effect to tiles
+        this.tiles.forEach((tile, index) => {
+            setTimeout(() => {
+                tile.classList.add('celebration-pulse');
+            }, index * 50);
+        });
+
+        // Change background color temporarily
+        document.body.style.background = 'linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #feca57)';
+        document.body.style.backgroundSize = '400% 400%';
+        document.body.style.animation = 'celebrationGradient 2s ease infinite';
+
+        // Reset after celebration
+        setTimeout(() => {
+            this.board.classList.remove('celebration');
+            this.tiles.forEach(tile => {
+                tile.classList.remove('celebration-pulse');
+            });
+            document.body.style.background = '';
+            document.body.style.animation = '';
+        }, 3000);
+    }
+
+    createConfetti() {
+        const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#fd79a8', '#fdcb6e'];
+        const confettiContainer = document.createElement('div');
+        confettiContainer.className = 'confetti-container';
+        confettiContainer.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9999;
+        `;
+
+        document.body.appendChild(confettiContainer);
+
+        // Create multiple confetti pieces
+        for (let i = 0; i < 50; i++) {
+            setTimeout(() => {
+                const confetti = document.createElement('div');
+                confetti.style.cssText = `
+                    position: absolute;
+                    width: 10px;
+                    height: 10px;
+                    background: ${colors[Math.floor(Math.random() * colors.length)]};
+                    top: -10px;
+                    left: ${Math.random() * 100}%;
+                    animation: confettiFall ${2 + Math.random() * 3}s linear forwards;
+                    transform: rotate(${Math.random() * 360}deg);
+                `;
+
+                confettiContainer.appendChild(confetti);
+
+                // Remove confetti after animation
+                setTimeout(() => {
+                    if (confetti.parentNode) {
+                        confetti.parentNode.removeChild(confetti);
+                    }
+                }, 5000);
+            }, i * 100);
+        }
+
+        // Remove container after all confetti is done
+        setTimeout(() => {
+            if (confettiContainer.parentNode) {
+                confettiContainer.parentNode.removeChild(confettiContainer);
+            }
+        }, 8000);
+    }
+
+    selectRandomBackground() {
+        // Only select random background if user hasn't set a preference
+        const backgroundSelect = document.getElementById('background-select');
+        if (backgroundSelect && backgroundSelect.options.length > 1) {
+            // Check if current background is still default
+            if (this.currentBackground === 'default.jpg' || !this.currentBackground) {
+                const randomIndex = Math.floor(Math.random() * backgroundSelect.options.length);
+                const randomBackground = backgroundSelect.options[randomIndex].value;
+
+                this.currentBackground = randomBackground;
+                backgroundSelect.value = randomBackground;
+
+                // Save the random selection as user preference
+                this.saveUserPreference(randomBackground);
+            }
         }
     }
 }
