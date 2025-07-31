@@ -1,7 +1,7 @@
 <?php
 header('Content-Type: application/json');
-require_once '../includes/auth.php';
-require_once '../includes/game_functions.php';
+require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/game_functions.php';
 
 // Check if user is logged in
 if (!$auth->isLoggedIn()) {

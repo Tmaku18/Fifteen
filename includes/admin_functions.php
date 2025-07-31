@@ -195,22 +195,22 @@ function deleteBackgroundImage($imageId) {
 function getGameStatistics() {
     try {
         $pdo = getDBConnection();
-        
+
         // Get total users
         $stmt = $pdo->prepare("SELECT COUNT(*) as total_users FROM users WHERE is_admin = 0");
         $stmt->execute();
         $totalUsers = $stmt->fetch(PDO::FETCH_ASSOC)['total_users'];
-        
+
         // Get total games
         $stmt = $pdo->prepare("SELECT COUNT(*) as total_games FROM game_stats");
         $stmt->execute();
         $totalGames = $stmt->fetch(PDO::FETCH_ASSOC)['total_games'];
-        
+
         // Get average time and moves
         $stmt = $pdo->prepare("SELECT AVG(time_seconds) as avg_time, AVG(moves) as avg_moves FROM game_stats");
         $stmt->execute();
         $averages = $stmt->fetch(PDO::FETCH_ASSOC);
-        
+
         return [
             'total_users' => $totalUsers,
             'total_games' => $totalGames,
@@ -225,6 +225,75 @@ function getGameStatistics() {
             'avg_time' => 0,
             'avg_moves' => 0
         ];
+    }
+}
+
+// User Management Functions
+function getAllUsers() {
+    try {
+        $pdo = getDBConnection();
+        $stmt = $pdo->prepare("
+            SELECT u.*,
+                   COUNT(gs.id) as total_games,
+                   MIN(gs.time_seconds) as best_time,
+                   MIN(gs.moves) as best_moves
+            FROM users u
+            LEFT JOIN game_stats gs ON u.id = gs.user_id
+            GROUP BY u.id
+            ORDER BY u.created_at DESC
+        ");
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch(PDOException $e) {
+        error_log("Error getting users: " . $e->getMessage());
+        return [];
+    }
+}
+
+function updateUser($userId, $username, $isAdmin, $isActive) {
+    try {
+        $pdo = getDBConnection();
+        $stmt = $pdo->prepare("UPDATE users SET username = ?, is_admin = ?, is_active = ? WHERE id = ?");
+        return $stmt->execute([$username, $isAdmin ? 1 : 0, $isActive ? 1 : 0, $userId]);
+    } catch(PDOException $e) {
+        error_log("Error updating user: " . $e->getMessage());
+        return false;
+    }
+}
+
+function resetUserPassword($userId, $newPassword) {
+    try {
+        $pdo = getDBConnection();
+        $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
+        $stmt = $pdo->prepare("UPDATE users SET password = ? WHERE id = ?");
+        return $stmt->execute([$hashedPassword, $userId]);
+    } catch(PDOException $e) {
+        error_log("Error resetting password: " . $e->getMessage());
+        return false;
+    }
+}
+
+function deleteUser($userId) {
+    try {
+        $pdo = getDBConnection();
+
+        // Don't allow deletion of admin users
+        $stmt = $pdo->prepare("SELECT is_admin FROM users WHERE id = ?");
+        $stmt->execute([$userId]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($user && $user['is_admin']) {
+            return ['success' => false, 'message' => 'Cannot delete admin users.'];
+        }
+
+        // Delete user (cascading will handle related records)
+        $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
+        $stmt->execute([$userId]);
+
+        return ['success' => true, 'message' => 'User deleted successfully.'];
+    } catch(PDOException $e) {
+        error_log("Error deleting user: " . $e->getMessage());
+        return ['success' => false, 'message' => 'Database error occurred.'];
     }
 }
 ?>

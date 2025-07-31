@@ -11,18 +11,23 @@ class Auth {
     
     public function login($username, $password) {
         try {
-            $stmt = $this->pdo->prepare("SELECT id, username, password, is_admin FROM users WHERE username = ?");
+            $stmt = $this->pdo->prepare("SELECT id, username, password, is_admin, is_active FROM users WHERE username = ?");
             $stmt->execute([$username]);
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if ($user && password_verify($password, $user['password'])) {
+                // Check if account is active
+                if (!$user['is_active']) {
+                    return false; // Account is deactivated
+                }
+
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['username'] = $user['username'];
                 $_SESSION['is_admin'] = $user['is_admin'];
-                
+
                 // Create user preferences if they don't exist
                 $this->createUserPreferences($user['id']);
-                
+
                 return true;
             }
             return false;

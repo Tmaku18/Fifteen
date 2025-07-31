@@ -68,6 +68,7 @@ $gameStats = getGameStatistics();
             </div>
             <div class="header-right">
                 <span class="welcome">Welcome, <?php echo htmlspecialchars($user['username']); ?>!</span>
+                <a href="admin_users.php" class="btn btn-primary"><i class="fas fa-users"></i> Manage Users</a>
                 <a href="game.php" class="btn btn-primary"><i class="fas fa-gamepad"></i> Back to Game</a>
                 <a href="logout.php" class="btn btn-logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
             </div>
@@ -82,6 +83,40 @@ $gameStats = getGameStatistics();
         <?php endif; ?>
 
         <div class="admin-content">
+            <!-- Quick Navigation -->
+            <div class="nav-panel">
+                <h2><i class="fas fa-tachometer-alt"></i> Admin Dashboard</h2>
+                <div class="nav-grid">
+                    <a href="admin_users.php" class="nav-card">
+                        <div class="nav-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="nav-info">
+                            <h3>User Management</h3>
+                            <p>View, edit, and manage user accounts</p>
+                        </div>
+                    </a>
+                    <a href="#images-panel" class="nav-card" onclick="document.getElementById('images-panel').scrollIntoView()">
+                        <div class="nav-icon">
+                            <i class="fas fa-images"></i>
+                        </div>
+                        <div class="nav-info">
+                            <h3>Background Images</h3>
+                            <p>Upload and manage puzzle backgrounds</p>
+                        </div>
+                    </a>
+                    <a href="game.php" class="nav-card">
+                        <div class="nav-icon">
+                            <i class="fas fa-gamepad"></i>
+                        </div>
+                        <div class="nav-info">
+                            <h3>Play Game</h3>
+                            <p>Test the sliding puzzle game</p>
+                        </div>
+                    </a>
+                </div>
+            </div>
+
             <!-- Game Statistics -->
             <div class="stats-panel">
                 <h2><i class="fas fa-chart-bar"></i> Game Statistics</h2>
@@ -145,7 +180,7 @@ $gameStats = getGameStatistics();
             </div>
 
             <!-- Background Images Management -->
-            <div class="images-panel">
+            <div class="images-panel" id="images-panel">
                 <h2><i class="fas fa-images"></i> Manage Background Images</h2>
                 <div class="images-grid">
                     <?php foreach ($backgroundImages as $image): ?>

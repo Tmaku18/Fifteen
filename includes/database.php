@@ -34,6 +34,7 @@ function initializeDatabase() {
             username TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
             is_admin INTEGER DEFAULT 0,
+            is_active INTEGER DEFAULT 1,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )");
 
@@ -72,10 +73,17 @@ function initializeDatabase() {
         $stmt->execute(['nature.jpg', 'Nature Scene']);
         $stmt->execute(['abstract.jpg', 'Abstract Pattern']);
 
+        // Add is_active column if it doesn't exist (migration)
+        try {
+            $pdo->exec("ALTER TABLE users ADD COLUMN is_active INTEGER DEFAULT 1");
+        } catch(PDOException $e) {
+            // Column already exists, ignore error
+        }
+
         // Create default admin user (password: admin123)
         $adminPassword = password_hash('admin123', PASSWORD_DEFAULT);
-        $stmt = $pdo->prepare("INSERT OR IGNORE INTO users (username, password, is_admin) VALUES (?, ?, ?)");
-        $stmt->execute(['admin', $adminPassword, 1]);
+        $stmt = $pdo->prepare("INSERT OR IGNORE INTO users (username, password, is_admin, is_active) VALUES (?, ?, ?, ?)");
+        $stmt->execute(['admin', $adminPassword, 1, 1]);
 
         return true;
     } catch(PDOException $e) {
